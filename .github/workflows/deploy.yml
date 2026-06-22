@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm install
+      - run: npm install --legacy-peer-deps
       - run: node scripts/build.js
       - uses: actions/upload-pages-artifact@v3
         with:
