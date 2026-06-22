@@ -2,6 +2,6 @@
   "name": "boatrun-build",
   "private": true,
   "devDependencies": {
-    "javascript-obfuscator": "^4.1.1"
+    "javascript-obfuscator": "latest"
   }
 }
