@@ -45,20 +45,20 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
 /* Rower strip */
 .rower-strip{background:#fff;border-top:1px solid #ddd;padding:8px 8px 8px;
              overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
-             display:flex;gap:8px;flex-shrink:0;min-height:108px;align-items:stretch;
+             display:flex;gap:8px;flex-shrink:0;min-height:160px;align-items:stretch;
              padding-bottom:max(8px, env(safe-area-inset-bottom));}
-.rower-card{border-radius:6px;padding:9px 11px;min-width:108px;
+.rower-card{border-radius:6px;padding:10px 13px;min-width:140px;
             flex-shrink:0;border-left:4px solid #27ae60;display:flex;
             flex-direction:column;gap:1px;background:#f7f8fa;
             box-shadow:0 1px 3px rgba(0,0,0,.07);}
 .rower-card.stale{opacity:.45;}
-.rc-name{font-size:10px;font-weight:700;color:#111;white-space:nowrap;
-         overflow:hidden;text-overflow:ellipsis;max-width:88px;}
+.rc-name{font-size:13px;font-weight:700;color:#111;white-space:nowrap;
+         overflow:hidden;text-overflow:ellipsis;max-width:116px;}
 .rc-metrics{display:flex;gap:10px;margin-top:5px;}
 .rc-metric{display:flex;flex-direction:column;}
-.rc-val{font-family:'Roboto Condensed',sans-serif;font-size:23px;font-weight:700;
+.rc-val{font-family:'Roboto Condensed',sans-serif;font-size:30px;font-weight:700;
         color:#1a5276;line-height:1.05;}
-.rc-lbl{font-size:7px;color:#aaa;letter-spacing:.08em;margin-top:1px;}
+.rc-lbl{font-size:9px;color:#aaa;letter-spacing:.08em;margin-top:1px;}
 .rc-age{font-size:8px;color:#ccc;margin-top:auto;padding-top:4px;}
 .empty-strip{color:#bbb;font-size:12px;padding:8px 10px;display:flex;
              align-items:center;width:100%;justify-content:center;}
@@ -131,6 +131,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 
 let _markers  = {};   // deviceId → L.CircleMarker
 let _colorMap = {};   // deviceId → color string
 let _colorIdx = 0;
+let _positionedIds = new Set();
 
 function colorFor(id) {
     if (!_colorMap[id]) {
@@ -143,12 +144,16 @@ function colorFor(id) {
 function updateMap(rowers) {
     const ids = Object.keys(rowers);
 
-    // Remove markers for rowers who have left
     Object.keys(_markers).forEach(id => {
-        if (!rowers[id]) { _map.removeLayer(_markers[id]); delete _markers[id]; }
+        if (!rowers[id]) {
+            _map.removeLayer(_markers[id]);
+            delete _markers[id];
+            _positionedIds.delete(id);
+        }
     });
 
     const validPos = [];
+    let newRower = false;
     ids.forEach(id => {
         const r = rowers[id] || {};
         if (!r.lat || !r.lon) return;
@@ -168,13 +173,16 @@ function updateMap(rowers) {
             });
             _markers[id] = m;
         }
+        if (!_positionedIds.has(id)) { _positionedIds.add(id); newRower = true; }
         validPos.push(ll);
     });
 
-    if (validPos.length === 1) {
-        _map.setView(validPos[0], 16);
-    } else if (validPos.length > 1) {
-        try { _map.fitBounds(L.latLngBounds(validPos), { padding: [44, 44], maxZoom: 17 }); } catch {}
+    if (newRower) {
+        if (validPos.length === 1) {
+            _map.setView(validPos[0], 16);
+        } else if (validPos.length > 1) {
+            try { _map.fitBounds(L.latLngBounds(validPos), { padding: [44, 44], maxZoom: 17 }); } catch {}
+        }
     }
 }
 
@@ -248,6 +256,7 @@ function disconnect() {
     _rowers   = {};
     _colorMap = {};
     _colorIdx = 0;
+    _positionedIds.clear();
     Object.keys(_markers).forEach(id => { _map.removeLayer(_markers[id]); delete _markers[id]; });
     setPill(false);
     renderStrip({});
