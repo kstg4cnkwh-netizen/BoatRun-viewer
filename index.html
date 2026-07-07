@@ -293,6 +293,16 @@ setInterval(() => { if (Object.keys(_rowers).length) renderStrip(_rowers); }, 20
 
 // ── Map resize guard ──────────────────────────────────────────────────────
 new ResizeObserver(() => _map.invalidateSize()).observe(document.getElementById('map'));
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('code') || '').trim().toUpperCase();
+    if (code.length >= 3) {
+        document.getElementById('entry-code').value = code;
+        document.getElementById('squad-pill').textContent = code;
+        document.getElementById('entry-overlay').classList.add('hidden');
+        connect(code);
+    }
+})();
 </script>
 </body>
 </html>
