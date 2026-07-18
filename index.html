@@ -198,7 +198,7 @@ function renderStrip(rowers) {
     strip.innerHTML = ids.map(id => {
         const r     = rowers[id] || {};
         const age   = r.t ? Math.round((now - r.t) / 1000) : null;
-        const stale = age == null || age > 8;
+        const stale = age == null || age > 20;
         const col   = colorFor(id);
         return `<div class="rower-card${stale ? ' stale' : ''}" style="border-left-color:${col}">` +
             `<div class="rc-name">${r.name || 'Rower'}</div>` +
@@ -214,6 +214,12 @@ function renderStrip(rowers) {
 // ── Firebase listener ─────────────────────────────────────────────────────
 let _es     = null;
 let _rowers = {};
+let _hbInt  = null;
+let _hbCode = '';
+function _sendHb() {
+    if (!_hbCode) return;
+    try { fetch(SQUAD_DB_URL + '/squads/' + _hbCode + '/commands/hb.json', { method: 'PUT', body: JSON.stringify({ t: Date.now() }) }).catch(() => {}); } catch {}
+}
 
 function connect(code) {
     disconnect();
@@ -249,10 +255,16 @@ function connect(code) {
     _es.addEventListener('patch', e => handle(e.data));
     _es.onopen  = () => setPill(true);
     _es.onerror = () => setPill(false);
+    _hbCode = code;
+    _sendHb();
+    if (_hbInt) clearInterval(_hbInt);
+    _hbInt = setInterval(_sendHb, 25000);
 }
 
 function disconnect() {
     if (_es) { _es.close(); _es = null; }
+    _hbCode = '';
+    if (_hbInt) { clearInterval(_hbInt); _hbInt = null; }
     _rowers   = {};
     _colorMap = {};
     _colorIdx = 0;
