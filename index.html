@@ -406,8 +406,10 @@ document.getElementById('rower-strip').addEventListener('click', e => {
     if (dn) { moveTile(dn.dataset.moveId, 1); return; }
 });
 
-document.getElementById('tile-scale-up').addEventListener('click', () => bumpScale(1));
-document.getElementById('tile-scale-dn').addEventListener('click', () => bumpScale(-1));
+const _tsUp = document.getElementById('tile-scale-up');
+const _tsDn = document.getElementById('tile-scale-dn');
+if (_tsUp) _tsUp.addEventListener('click', () => bumpScale(1));
+if (_tsDn) _tsDn.addEventListener('click', () => bumpScale(-1));
 applyTileScale();
 
 // ── Age ticker ────────────────────────────────────────────────────────────
@@ -415,6 +417,8 @@ setInterval(() => { if (Object.keys(_rowers).length) renderStrip(_rowers); }, 20
 
 // ── Map resize guard ──────────────────────────────────────────────────────
 new ResizeObserver(() => _map.invalidateSize()).observe(document.getElementById('map'));
+setTimeout(() => { try { _map.invalidateSize(); } catch (e) {} }, 300);
+setTimeout(() => { try { _map.invalidateSize(); } catch (e) {} }, 1000);
 (function () {
     const params = new URLSearchParams(window.location.search);
     const code = (params.get('code') || '').trim().toUpperCase();
