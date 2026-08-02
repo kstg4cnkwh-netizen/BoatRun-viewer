@@ -52,6 +52,12 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
             flex-direction:column;gap:1px;background:#f7f8fa;
             box-shadow:0 1px 3px rgba(0,0,0,.07);}
 .rower-card.stale{opacity:.45;}
+.rc-move{display:flex;justify-content:flex-end;gap:3px;margin-bottom:2px;}
+.rc-move-up,.rc-move-dn{width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.1);
+                        color:#666;border:none;font-size:10px;line-height:20px;text-align:center;
+                        cursor:pointer;touch-action:manipulation;padding:0;}
+.rc-move-up:active,.rc-move-dn:active{background:rgba(0,0,0,.22);}
+.rc-move-up:disabled,.rc-move-dn:disabled{opacity:.25;}
 .rc-name{font-size:13px;font-weight:700;color:#111;white-space:nowrap;
          overflow:hidden;text-overflow:ellipsis;max-width:116px;}
 .rc-metrics{display:flex;gap:10px;margin-top:5px;}
@@ -117,7 +123,15 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
 <script>
 'use strict';
 const SQUAD_DB_URL = 'https://boatrun-default-rtdb.asia-southeast1.firebasedatabase.app';
-const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#16a085'];
+const COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#7b4bbd','#2980b9','#e67e22','#16a085','#8e44ad','#d81b60','#00897b','#5c6bc0'];
+const DEMO_SQUAD_CODE = 'DEMO2026';
+const DEMO_NAMES = ['Thomas', 'Richard', 'Harry', 'Larry'];
+const DEMO_BASES = [
+    { rate: 24, pace: 112 },
+    { rate: 26, pace: 108 },
+    { rate: 22, pace: 118 },
+    { rate: 28, pace: 104 }
+];
 
 const fmt = s => {
     s = Math.max(0, Math.round(s));
@@ -139,6 +153,29 @@ function colorFor(id) {
         _colorIdx++;
     }
     return _colorMap[id];
+}
+
+// ── Tile re-ordering (same pattern as Coach overview) ───────────────────
+const TILE_ORDER_KEY = 'boatrun_viewer_tile_order';
+function getTileOrder() {
+    try { const v = JSON.parse(localStorage.getItem(TILE_ORDER_KEY)); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveTileOrder(arr) { try { localStorage.setItem(TILE_ORDER_KEY, JSON.stringify(arr)); } catch {} }
+function orderedIds(ids) {
+    const saved = getTileOrder();
+    const idSet = new Set(ids);
+    const kept = saved.filter(id => idSet.has(id));
+    const extra = ids.filter(id => !kept.includes(id));
+    return kept.concat(extra);
+}
+function moveTile(id, dir) {
+    const ids = orderedIds(Object.keys(_rowers));
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    const tmp = ids[i]; ids[i] = ids[j]; ids[j] = tmp;
+    saveTileOrder(ids);
+    renderStrip(_rowers);
 }
 
 function updateMap(rowers) {
@@ -189,18 +226,22 @@ function updateMap(rowers) {
 // ── Rower strip ───────────────────────────────────────────────────────────
 function renderStrip(rowers) {
     const strip = document.getElementById('rower-strip');
-    const ids = Object.keys(rowers);
+    const ids = orderedIds(Object.keys(rowers));
     if (!ids.length) {
         strip.innerHTML = '<div class="empty-strip">Waiting for rowers…</div>';
         return;
     }
     const now = Date.now();
-    strip.innerHTML = ids.map(id => {
+    strip.innerHTML = ids.map((id, idx) => {
         const r     = rowers[id] || {};
         const age   = r.t ? Math.round((now - r.t) / 1000) : null;
         const stale = age == null || age > 20;
         const col   = colorFor(id);
         return `<div class="rower-card${stale ? ' stale' : ''}" style="border-left-color:${col}">` +
+            `<div class="rc-move">` +
+              `<button class="rc-move-up" data-move-id="${id}" ${idx === 0 ? 'disabled' : ''}>&#9650;</button>` +
+              `<button class="rc-move-dn" data-move-id="${id}" ${idx === ids.length - 1 ? 'disabled' : ''}>&#9660;</button>` +
+            `</div>` +
             `<div class="rc-name">${r.name || 'Rower'}</div>` +
             `<div class="rc-metrics">` +
               `<div class="rc-metric"><div class="rc-val">${r.rate != null ? r.rate : '--'}</div><div class="rc-lbl">SPM</div></div>` +
@@ -212,18 +253,44 @@ function renderStrip(rowers) {
 }
 
 // ── Firebase listener ─────────────────────────────────────────────────────
-let _es     = null;
-let _rowers = {};
-let _hbInt  = null;
-let _hbCode = '';
+let _es        = null;
+let _rowers    = {};
+let _hbInt     = null;
+let _hbCode    = '';
+let _demoTimer = null;
+let _demoTick  = 0;
 function _sendHb() {
     if (!_hbCode) return;
     try { fetch(SQUAD_DB_URL + '/squads/' + _hbCode + '/commands/hb.json', { method: 'PUT', body: JSON.stringify({ t: Date.now() }) }).catch(() => {}); } catch {}
 }
 
+function startDemo() {
+    _demoTick = 0;
+    const step = () => {
+        _demoTick++;
+        _rowers = {};
+        DEMO_BASES.forEach((b, i) => {
+            const rate = b.rate + (Math.random() * 4 - 2);
+            const pace = b.pace + (Math.random() * 6 - 3);
+            _rowers['demo' + i] = {
+                name: DEMO_NAMES[i],
+                t: Date.now(),
+                rate: Math.round(Math.max(16, Math.min(34, rate))),
+                pace: Math.max(95, pace)
+            };
+        });
+        renderStrip(_rowers);
+        updateMap(_rowers);
+    };
+    step();
+    setPill(true);
+    _demoTimer = setInterval(step, 3000);
+}
+
 function connect(code) {
     disconnect();
     if (!code) return;
+    if (code === DEMO_SQUAD_CODE) { startDemo(); return; }
     _es = new EventSource(SQUAD_DB_URL + '/squads/' + code + '/rowers.json');
 
     const handle = raw => {
@@ -263,6 +330,7 @@ function connect(code) {
 
 function disconnect() {
     if (_es) { _es.close(); _es = null; }
+    if (_demoTimer) { clearInterval(_demoTimer); _demoTimer = null; }
     _hbCode = '';
     if (_hbInt) { clearInterval(_hbInt); _hbInt = null; }
     _rowers   = {};
@@ -298,6 +366,12 @@ document.getElementById('disc-btn').addEventListener('click', () => {
     document.getElementById('entry-code').value = '';
     document.getElementById('squad-pill').textContent = '';
     document.getElementById('entry-overlay').classList.remove('hidden');
+});
+document.getElementById('rower-strip').addEventListener('click', e => {
+    const up = e.target.closest('.rc-move-up[data-move-id]');
+    if (up) { moveTile(up.dataset.moveId, -1); return; }
+    const dn = e.target.closest('.rc-move-dn[data-move-id]');
+    if (dn) { moveTile(dn.dataset.moveId, 1); return; }
 });
 
 // ── Age ticker ────────────────────────────────────────────────────────────
