@@ -14,13 +14,9 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;-webkit-text-size-adjust:none}
-body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:hidden;
+body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef;overflow:hidden;
      padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
-     display:flex;flex-direction:column;position:relative;}
-@media (min-height:760px) and (min-width:520px){
-  body{height:760px;max-height:100dvh;max-width:420px;margin:24px auto;
-       box-shadow:0 0 30px rgba(0,0,0,.25);border-radius:12px;overflow:hidden;}
-}
+     display:flex;flex-direction:column;position:relative;--maph:45%;}
 
 /* Top bar */
 .top-bar{background:#1a5276;color:#fff;padding:10px 14px;display:flex;align-items:center;
@@ -37,11 +33,16 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
           font-family:'Roboto',sans-serif;white-space:nowrap;touch-action:manipulation;}
 .disc-btn:active{background:rgba(255,255,255,.28);}
 
-/* Map + tile scroll area (same scroll behaviour as Coach overview) */
-.live-scroll-area{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
-                  display:flex;flex-direction:column;}
-.map-section{flex-shrink:0;}
-#map{height:220px;width:100%;}
+/* Split pane: map on top, tiles below, draggable divider between */
+.live-scroll-area{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;}
+.map-section{height:var(--maph);min-height:60px;flex-shrink:0;width:100%;}
+#map{height:100%;width:100%;}
+.split-handle{flex-shrink:0;height:22px;background:#dfe3e8;border-top:1px solid #c8ced6;
+              border-bottom:1px solid #c8ced6;cursor:row-resize;touch-action:none;
+              display:flex;align-items:center;justify-content:center;position:relative;z-index:20;}
+.split-handle::before{content:'';width:46px;height:5px;border-radius:3px;background:#9aa4b0;}
+.split-handle.dragging{background:#cbd3dc;}
+.split-handle.dragging::before{background:#1a5276;}
 .scale-ctl{position:absolute;right:10px;bottom:calc(16px + env(safe-area-inset-bottom));
            z-index:25;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;
            box-shadow:0 2px 6px rgba(0,0,0,.3);}
@@ -56,14 +57,15 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
              font-weight:700;letter-spacing:.06em;white-space:nowrap;}
 .rower-label::before{display:none;}
 
-/* Rower strip */
-.rower-strip{background:#fff;border-top:1px solid #ddd;padding:8px 8px 8px;
-             overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
-             display:flex;gap:8px;flex-shrink:0;min-height:160px;align-items:stretch;
+/* Rower tiles — full width, wrap to new rows, scroll vertically if needed */
+.rower-strip{background:#fff;padding:8px;width:100%;flex:1;min-height:0;
+             overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+             display:grid;gap:8px;align-content:start;
+             grid-template-columns:repeat(auto-fill,minmax(calc(150px*var(--ts)),1fr));
              --ts:1;
              padding-bottom:max(8px, env(safe-area-inset-bottom));}
-.rower-card{border-radius:6px;padding:10px 13px;min-width:140px;
-            flex-shrink:0;border-left:4px solid #27ae60;display:flex;
+.rower-card{border-radius:6px;padding:10px 13px;min-width:0;
+            border-left:4px solid #27ae60;display:flex;
             flex-direction:column;gap:1px;background:#f7f8fa;
             box-shadow:0 1px 3px rgba(0,0,0,.07);}
 .rower-card.stale{opacity:.45;}
@@ -74,15 +76,15 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
 .rc-move-up:active,.rc-move-dn:active{background:rgba(0,0,0,.22);}
 .rc-move-up:disabled,.rc-move-dn:disabled{opacity:.25;}
 .rc-name{font-size:calc(13px*var(--ts));font-weight:700;color:#111;white-space:nowrap;
-         overflow:hidden;text-overflow:ellipsis;max-width:116px;}
+         overflow:hidden;text-overflow:ellipsis;}
 .rc-metrics{display:flex;gap:10px;margin-top:5px;}
 .rc-metric{display:flex;flex-direction:column;}
 .rc-val{font-family:'Roboto Condensed',sans-serif;font-size:calc(30px*var(--ts));font-weight:700;
         color:#1a5276;line-height:1.05;}
 .rc-lbl{font-size:calc(9px*var(--ts));color:#aaa;letter-spacing:.08em;margin-top:1px;}
 .rc-age{font-size:8px;color:#ccc;margin-top:auto;padding-top:4px;}
-.empty-strip{color:#bbb;font-size:12px;padding:8px 10px;display:flex;
-             align-items:center;width:100%;justify-content:center;}
+.empty-strip{color:#bbb;font-size:12px;padding:20px 10px;display:flex;
+             align-items:center;width:100%;justify-content:center;grid-column:1/-1;}
 
 /* Entry overlay */
 .entry-overlay{position:fixed;inset:0;background:#1a5276;display:flex;flex-direction:column;
@@ -131,7 +133,8 @@ body{height:100dvh;font-family:'Roboto',sans-serif;background:#efefef;overflow:h
   </div>
 </div>
 <div class="live-scroll-area" id="live-scroll-area">
-  <div class="map-section"><div id="map"></div></div>
+  <div class="map-section" id="map-section"><div id="map"></div></div>
+  <div class="split-handle" id="split-handle" title="Drag to resize map"></div>
   <div class="rower-strip" id="rower-strip">
     <div class="empty-strip">Waiting for rowers…</div>
   </div>
@@ -410,6 +413,60 @@ document.getElementById('rower-strip').addEventListener('click', e => {
     const dn = e.target.closest('.rc-move-dn[data-move-id]');
     if (dn) { moveTile(dn.dataset.moveId, 1); return; }
 });
+
+// ── Draggable map / tiles divider ────────────────────────────────────────
+const MAP_H_KEY = 'boatrun_viewer_map_height';
+function applyMapHeight(px) {
+    const area = document.getElementById('live-scroll-area');
+    if (!area) return;
+    const max = Math.max(80, area.clientHeight - 120);
+    const v = Math.round(Math.max(60, Math.min(max, px)));
+    document.body.style.setProperty('--maph', v + 'px');
+    try { _map.invalidateSize(); } catch (e) {}
+    return v;
+}
+(function initSplit() {
+    const handle = document.getElementById('split-handle');
+    const area   = document.getElementById('live-scroll-area');
+    const sect   = document.getElementById('map-section');
+    if (!handle || !area || !sect) return;
+
+    const saved = parseFloat(localStorage.getItem(MAP_H_KEY));
+    setTimeout(() => {
+        applyMapHeight(saved > 0 ? saved : area.clientHeight * 0.45);
+    }, 60);
+
+    let dragging = false;
+    const onMove = e => {
+        if (!dragging) return;
+        e.preventDefault();
+        const y = (e.touches ? e.touches[0].clientY : e.clientY);
+        applyMapHeight(y - area.getBoundingClientRect().top);
+    };
+    const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        try { localStorage.setItem(MAP_H_KEY, String(sect.clientHeight)); } catch (e) {}
+        try { _map.invalidateSize(); } catch (e) {}
+    };
+    const onDown = e => {
+        dragging = true;
+        handle.classList.add('dragging');
+        if (e.cancelable) e.preventDefault();
+    };
+    handle.addEventListener('mousedown', onDown);
+    handle.addEventListener('touchstart', onDown, { passive: false });
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchend', onUp);
+    document.addEventListener('touchcancel', onUp);
+    window.addEventListener('resize', () => {
+        const cur = parseFloat(localStorage.getItem(MAP_H_KEY));
+        applyMapHeight(cur > 0 ? cur : area.clientHeight * 0.45);
+    });
+})();
 
 const _tsUp = document.getElementById('tile-scale-up');
 const _tsDn = document.getElementById('tile-scale-dn');
