@@ -105,6 +105,7 @@ body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef
            background:#27ae60;color:#fff;font-family:'Roboto',sans-serif;font-size:14px;
            font-weight:700;letter-spacing:.14em;cursor:pointer;touch-action:manipulation;}
 .entry-btn:active{background:#229954;}
+.entry-btn:disabled{background:#555;opacity:.5;cursor:default;}
 .entry-hint{margin-top:20px;font-size:11px;color:rgba(255,255,255,.38);
             text-align:center;line-height:1.8;}
 </style>
@@ -117,9 +118,9 @@ body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef
   <div class="entry-title">LIVE VIEW</div>
   <div class="entry-label">SQUAD CODE</div>
   <input class="entry-input" id="entry-code" type="text" maxlength="8"
-         placeholder="·····" autocomplete="off" autocorrect="off"
+         placeholder="·······" autocomplete="off" autocorrect="off"
          autocapitalize="characters" spellcheck="false"/>
-  <button class="entry-btn" id="entry-btn">CONNECT</button>
+  <button class="entry-btn" id="entry-btn" disabled>CONNECT</button>
   <div class="entry-hint">Enter the squad code from your coach<br/>to watch the session live</div>
 </div>
 
@@ -389,12 +390,17 @@ function setPill(on) {
 }
 
 // ── UI wiring ─────────────────────────────────────────────────────────────
+function validEntryCodeLen(code) { return code.length === 7 || code === DEMO_SQUAD_CODE; }
 document.getElementById('entry-btn').addEventListener('click', () => {
     const code = (document.getElementById('entry-code').value || '').trim().toUpperCase();
-    if (code.length < 3) return;
+    if (!validEntryCodeLen(code)) return;
     document.getElementById('squad-pill').textContent = code;
     document.getElementById('entry-overlay').classList.add('hidden');
     connect(code);
+});
+document.getElementById('entry-code').addEventListener('input', () => {
+    const code = (document.getElementById('entry-code').value || '').trim().toUpperCase();
+    document.getElementById('entry-btn').disabled = !validEntryCodeLen(code);
 });
 
 document.getElementById('entry-code').addEventListener('keydown', e => {
