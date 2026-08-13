@@ -328,11 +328,78 @@ function startDemo() {
     _demoTimer = setInterval(step, 3000);
 }
 
-function connect(code) {
+// ── Squad password ────────────────────────────────────────────────────────
+// Live data is read through the Worker, which checks the password server-side.
+const SQUAD_WORKER = 'https://boatrun-squad.davidmacready74.workers.dev';
+const SQ_PW_PREFIX = '_squad_pw_';
+const _sqPwOk = {};
+function getSquadPw(code) { try { return localStorage.getItem(SQ_PW_PREFIX + (code || '').toUpperCase()) || ''; } catch (e) { return ''; } }
+function setSquadPw(code, pw) { try { if (pw) localStorage.setItem(SQ_PW_PREFIX + (code || '').toUpperCase(), pw); else localStorage.removeItem(SQ_PW_PREFIX + (code || '').toUpperCase()); } catch (e) {} }
+function sqProxy(code, sub, extra) {
+    const c = (code || '').toUpperCase();
+    let u = SQUAD_WORKER + '/squad/' + c + '/' + sub + '?pw=' + encodeURIComponent(getSquadPw(c));
+    if (extra) u += '&' + extra;
+    return u;
+}
+async function checkSquadPw(code, pw) {
+    const c = (code || '').toUpperCase();
+    try {
+        const r = await fetch(SQUAD_WORKER + '/squad/' + c + '/check?pw=' + encodeURIComponent(pw || ''));
+        if (r.ok) return 'ok';
+        if (r.status === 401) return 'bad';
+        return 'offline';
+    } catch (e) { return 'offline'; }
+}
+async function ensureSquadUnlocked(code) {
+    const c = (code || '').toUpperCase();
+    if (!c || c === DEMO_SQUAD_CODE) return true;
+    if (_sqPwOk[c]) return true;
+    const first = await checkSquadPw(c, getSquadPw(c));
+    if (first === 'ok') { _sqPwOk[c] = true; return true; }
+    if (first === 'offline') return true;
+    const entered = await promptSquadPassword(c);
+    if (entered === null) return false;
+    const second = await checkSquadPw(c, entered);
+    if (second === 'ok') { setSquadPw(c, entered); _sqPwOk[c] = true; return true; }
+    alert(second === 'offline' ? 'Could not check the password \u2014 no connection.' : 'Wrong squad password.');
+    return false;
+}
+function promptSquadPassword(code) {
+    return new Promise(resolve => {
+        const old = document.getElementById('_sq_pw_modal'); if (old) old.remove();
+        const ov = document.createElement('div');
+        ov.id = '_sq_pw_modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+        const p = document.createElement('div');
+        p.style.cssText = 'background:#fff;border-radius:12px;padding:18px;width:100%;max-width:340px;font-family:-apple-system,"Roboto",sans-serif;color:#000;';
+        p.innerHTML = '<div style="font-size:15px;font-weight:700;margin-bottom:6px;">SQUAD PASSWORD</div>'
+            + '<div style="font-size:12px;color:#666;margin-bottom:12px;">Squad ' + code + ' is protected. Enter the password your coach set.</div>'
+            + '<input id="_sq_pw_in" type="password" autocomplete="off" placeholder="Password" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;"/>'
+            + '<div style="display:flex;gap:8px;margin-top:12px;">'
+            + '<button id="_sq_pw_cancel" style="flex:1;padding:12px;border:none;border-radius:8px;background:#e5e5ea;font-size:14px;font-weight:600;font-family:inherit;">CANCEL</button>'
+            + '<button id="_sq_pw_ok" style="flex:1;padding:12px;border:none;border-radius:8px;background:#1a5276;color:#fff;font-size:14px;font-weight:600;font-family:inherit;">UNLOCK</button>'
+            + '</div>';
+        ov.appendChild(p);
+        document.body.appendChild(ov);
+        const inp = document.getElementById('_sq_pw_in');
+        setTimeout(() => { try { inp.focus(); } catch (e) {} }, 60);
+        const done = v => { ov.remove(); resolve(v); };
+        document.getElementById('_sq_pw_cancel').onclick = () => done(null);
+        document.getElementById('_sq_pw_ok').onclick = () => done(inp.value || '');
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(inp.value || ''); if (e.key === 'Escape') done(null); });
+        ov.onclick = e => { if (e.target === ov) done(null); };
+    });
+}
+async function connect(code) {
     disconnect();
     if (!code) return;
     if (code === DEMO_SQUAD_CODE) { startDemo(); return; }
-    _es = new EventSource(SQUAD_DB_URL + '/squads/' + code + '/rowers.json');
+    if (!(await ensureSquadUnlocked(code))) {
+        document.getElementById('squad-pill').textContent = '';
+        document.getElementById('entry-overlay').classList.remove('hidden');
+        return;
+    }
+    _es = new EventSource(sqProxy(code, 'rowers', 'stream=1'));
 
     const handle = raw => {
         let msg; try { msg = JSON.parse(raw); } catch { return; }
