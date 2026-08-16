@@ -22,12 +22,18 @@ body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef
 .top-bar{background:#1a5276;color:#fff;padding:10px 14px;display:flex;align-items:center;
          justify-content:space-between;flex-shrink:0;gap:8px;}
 .top-title{font-size:13px;font-weight:700;letter-spacing:.12em;white-space:nowrap;}
-.top-right{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;}
+.top-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end;}
 .conn-pill{font-size:9px;font-weight:700;letter-spacing:.08em;padding:4px 9px;border-radius:10px;
            background:rgba(255,255,255,.18);color:rgba(255,255,255,.7);white-space:nowrap;}
 .conn-pill.on{background:#27ae60;color:#fff;}
 .squad-pill{font-size:9px;font-weight:700;letter-spacing:.16em;padding:4px 9px;border-radius:10px;
-            background:rgba(255,255,255,.13);color:rgba(255,255,255,.9);white-space:nowrap;}
+            background:rgba(255,255,255,.13);color:rgba(255,255,255,.9);white-space:nowrap;
+            border:none;cursor:pointer;font-family:'Roboto',sans-serif;touch-action:manipulation;}
+.squad-pill:active{background:rgba(255,255,255,.32);}
+.add-btn{font-size:9px;font-weight:700;letter-spacing:.06em;padding:4px 9px;border-radius:10px;
+         background:#27ae60;color:#fff;border:none;cursor:pointer;font-family:'Roboto',sans-serif;
+         white-space:nowrap;touch-action:manipulation;}
+.add-btn:active{background:#229954;}
 .disc-btn{font-size:9px;font-weight:700;letter-spacing:.06em;padding:4px 9px;border-radius:10px;
           background:rgba(255,255,255,.15);color:rgba(255,255,255,.8);border:none;cursor:pointer;
           font-family:'Roboto',sans-serif;white-space:nowrap;touch-action:manipulation;}
@@ -86,6 +92,9 @@ body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef
 .empty-strip{color:#bbb;font-size:12px;padding:20px 10px;display:flex;
              align-items:center;width:100%;justify-content:center;grid-column:1/-1;}
 
+.rc-squad{font-size:calc(8px*var(--ts));font-weight:700;letter-spacing:.14em;color:#9aa4b0;
+           margin-bottom:1px;}
+
 /* Entry overlay */
 .entry-overlay{position:fixed;inset:0;background:#1a5276;display:flex;flex-direction:column;
                align-items:center;justify-content:center;z-index:1000;
@@ -108,6 +117,12 @@ body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef
 .entry-btn:disabled{background:#555;opacity:.5;cursor:default;}
 .entry-hint{margin-top:20px;font-size:11px;color:rgba(255,255,255,.38);
             text-align:center;line-height:1.8;}
+.entry-cancel{margin-top:10px;width:100%;max-width:280px;padding:13px;border-radius:6px;border:none;
+              background:rgba(255,255,255,.16);color:#fff;font-family:'Roboto',sans-serif;
+              font-size:12px;font-weight:700;letter-spacing:.14em;cursor:pointer;
+              touch-action:manipulation;}
+.entry-cancel:active{background:rgba(255,255,255,.3);}
+.entry-cancel.hidden{display:none;}
 </style>
 </head>
 <body>
@@ -115,20 +130,22 @@ body{height:100dvh;width:100%;font-family:'Roboto',sans-serif;background:#efefef
 <!-- Entry overlay -->
 <div class="entry-overlay" id="entry-overlay">
   <div class="entry-logo">BOATRUN</div>
-  <div class="entry-title">LIVE VIEW</div>
+  <div class="entry-title" id="entry-title">LIVE VIEW</div>
   <div class="entry-label">SQUAD CODE</div>
   <input class="entry-input" id="entry-code" type="text" maxlength="7"
          placeholder="·······" autocomplete="off" autocorrect="off"
          autocapitalize="characters" spellcheck="false"/>
   <button class="entry-btn" id="entry-btn" disabled>CONNECT</button>
   <div class="entry-hint">Enter the squad code from your coach<br/>to watch the session live</div>
+  <button class="entry-cancel hidden" id="entry-cancel">CANCEL</button>
 </div>
 
 <!-- Main UI (hidden until connected) -->
 <div class="top-bar">
   <span class="top-title">BOATRUN LIVE</span>
   <div class="top-right">
-    <span class="squad-pill" id="squad-pill"></span>
+    <span id="squad-pills" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"></span>
+    <button class="add-btn" id="add-squad-btn">+ SQUAD</button>
     <span class="conn-pill" id="conn-pill">OFFLINE</span>
     <button class="disc-btn" id="disc-btn">✕ LEAVE</button>
   </div>
@@ -273,16 +290,19 @@ function renderStrip(rowers) {
         return;
     }
     const now = Date.now();
+    const multi = Object.keys(_squads).length > 1;
     strip.innerHTML = ids.map((id, idx) => {
         const r     = rowers[id] || {};
         const age   = r.t ? Math.round((now - r.t) / 1000) : null;
         const stale = age == null || age > 20;
         const col   = colorFor(id);
+        const sq    = id.indexOf('|') > 0 ? id.split('|')[0] : '';
         return `<div class="rower-card${stale ? ' stale' : ''}" style="border-left-color:${col}">` +
             `<div class="rc-move">` +
               `<button class="rc-move-up" data-move-id="${id}" ${idx === 0 ? 'disabled' : ''}>&#9650;</button>` +
               `<button class="rc-move-dn" data-move-id="${id}" ${idx === ids.length - 1 ? 'disabled' : ''}>&#9660;</button>` +
             `</div>` +
+            (multi && sq ? `<div class="rc-squad">${sq}</div>` : '') +
             `<div class="rc-name">${r.name || 'Rower'}</div>` +
             `<div class="rc-metrics">` +
               `<div class="rc-metric"><div class="rc-val">${r.rate != null ? r.rate : '--'}</div><div class="rc-lbl">SPM</div></div>` +
@@ -293,27 +313,26 @@ function renderStrip(rowers) {
     }).join('');
 }
 
-// ── Firebase listener ─────────────────────────────────────────────────────
-let _es        = null;
-let _rowers    = {};
-let _hbInt     = null;
-let _hbCode    = '';
-let _demoTimer = null;
-let _demoTick  = 0;
-function _sendHb() {
-    if (!_hbCode) return;
-    try { fetch(SQUAD_DB_URL + '/squads/' + _hbCode + '/commands/hb.json', { method: 'PUT', body: JSON.stringify({ t: Date.now() }) }).catch(() => {}); } catch {}
+// ── Firebase listener (multi-squad) ───────────────────────────────────────
+let _squads = {};   // CODE -> { es, hbInt, demoTimer, on }
+let _rowers = {};   // "CODE|deviceId" -> live payload
+
+function _sendHb(code) {
+    if (!code) return;
+    try { fetch(SQUAD_DB_URL + '/squads/' + code + '/commands/hb.json', { method: 'PUT', body: JSON.stringify({ t: Date.now() }) }).catch(() => {}); } catch {}
 }
 
-function startDemo() {
-    _demoTick = 0;
+function clearSquadRowers(code) {
+    Object.keys(_rowers).forEach(k => { if (k.indexOf(code + '|') === 0) delete _rowers[k]; });
+}
+
+function startDemo(code) {
     const step = () => {
-        _demoTick++;
-        _rowers = {};
+        clearSquadRowers(code);
         DEMO_BASES.forEach((b, i) => {
             const rate = b.rate + (Math.random() * 4 - 2);
             const pace = b.pace + (Math.random() * 6 - 3);
-            _rowers['demo' + i] = {
+            _rowers[code + '|demo' + i] = {
                 name: DEMO_NAMES[i],
                 t: Date.now(),
                 rate: Math.round(Math.max(16, Math.min(34, rate))),
@@ -324,8 +343,9 @@ function startDemo() {
         updateMap(_rowers);
     };
     step();
-    setPill(true);
-    _demoTimer = setInterval(step, 3000);
+    _squads[code].on = true;
+    setPill();
+    _squads[code].demoTimer = setInterval(step, 3000);
 }
 
 // ── Squad password ────────────────────────────────────────────────────────
@@ -390,81 +410,150 @@ function promptSquadPassword(code) {
         ov.onclick = e => { if (e.target === ov) done(null); };
     });
 }
-async function connect(code) {
-    disconnect();
-    if (!code) return;
-    if (code === DEMO_SQUAD_CODE) { startDemo(); return; }
-    if (!(await ensureSquadUnlocked(code))) {
-        document.getElementById('squad-pill').textContent = '';
-        document.getElementById('entry-overlay').classList.remove('hidden');
-        return;
+async function addSquad(code) {
+    code = (code || '').trim().toUpperCase();
+    if (!code) return false;
+    if (_squads[code]) return true;
+
+    if (code === DEMO_SQUAD_CODE) {
+        _squads[code] = { es: null, hbInt: null, demoTimer: null, on: false };
+        renderSquadPills();
+        startDemo(code);
+        return true;
     }
-    _es = new EventSource(sqProxy(code, 'rowers', 'stream=1'));
+
+    if (!(await ensureSquadUnlocked(code))) return false;
+
+    const S = { es: null, hbInt: null, demoTimer: null, on: false };
+    _squads[code] = S;
+    renderSquadPills();
 
     const handle = raw => {
+        if (_squads[code] !== S) return;
         let msg; try { msg = JSON.parse(raw); } catch { return; }
         if (!msg) return;
         if (msg.path === '/') {
-            _rowers = {};
+            clearSquadRowers(code);
             const snap = msg.data || {};
             Object.keys(snap).forEach(id => {
-                if (snap[id] && snap[id].live) _rowers[id] = snap[id].live;
+                if (snap[id] && snap[id].live) _rowers[code + '|' + id] = snap[id].live;
             });
         } else {
             const parts = msg.path.split('/').filter(Boolean);
             if (!parts.length) return;
-            const id = parts[0];
+            const key = code + '|' + parts[0];
             if (msg.data === null) {
-                delete _rowers[id];
+                delete _rowers[key];
             } else if (parts.length === 1) {
-                if (msg.data && msg.data.live) _rowers[id] = msg.data.live;
+                if (msg.data && msg.data.live) _rowers[key] = msg.data.live;
             } else if (parts[1] === 'live') {
-                _rowers[id] = msg.data;
+                _rowers[key] = msg.data;
             }
         }
         renderStrip(_rowers);
         updateMap(_rowers);
     };
 
-    _es.addEventListener('put',   e => handle(e.data));
-    _es.addEventListener('patch', e => handle(e.data));
-    _es.onopen  = () => setPill(true);
-    _es.onerror = () => setPill(false);
-    _hbCode = code;
-    _sendHb();
-    if (_hbInt) clearInterval(_hbInt);
-    _hbInt = setInterval(_sendHb, 25000);
+    S.es = new EventSource(sqProxy(code, 'rowers', 'stream=1'));
+    S.es.addEventListener('put',   e => handle(e.data));
+    S.es.addEventListener('patch', e => handle(e.data));
+    S.es.onopen  = () => { S.on = true;  setPill(); };
+    S.es.onerror = () => { S.on = false; setPill(); };
+
+    _sendHb(code);
+    S.hbInt = setInterval(() => _sendHb(code), 25000);
+    setPill();
+    return true;
+}
+
+function removeSquad(code) {
+    const S = _squads[code];
+    if (!S) return;
+    if (S.es) { try { S.es.close(); } catch (e) {} }
+    if (S.hbInt) clearInterval(S.hbInt);
+    if (S.demoTimer) clearInterval(S.demoTimer);
+    delete _squads[code];
+
+    Object.keys(_rowers).forEach(k => {
+        if (k.indexOf(code + '|') === 0) {
+            delete _rowers[k];
+            if (_markers[k]) { try { _map.removeLayer(_markers[k]); } catch (e) {} delete _markers[k]; }
+            _positionedIds.delete(k);
+            delete _colorMap[k];
+        }
+    });
+
+    renderSquadPills();
+    setPill();
+    renderStrip(_rowers);
+    updateMap(_rowers);
+    if (!Object.keys(_squads).length) openEntry(false);
 }
 
 function disconnect() {
-    if (_es) { _es.close(); _es = null; }
-    if (_demoTimer) { clearInterval(_demoTimer); _demoTimer = null; }
-    _hbCode = '';
-    if (_hbInt) { clearInterval(_hbInt); _hbInt = null; }
+    Object.keys(_squads).forEach(c => {
+        const S = _squads[c];
+        if (S.es) { try { S.es.close(); } catch (e) {} }
+        if (S.hbInt) clearInterval(S.hbInt);
+        if (S.demoTimer) clearInterval(S.demoTimer);
+    });
+    _squads   = {};
     _rowers   = {};
     _colorMap = {};
     _colorIdx = 0;
     _positionedIds.clear();
-    Object.keys(_markers).forEach(id => { _map.removeLayer(_markers[id]); delete _markers[id]; });
-    setPill(false);
+    Object.keys(_markers).forEach(id => { try { _map.removeLayer(_markers[id]); } catch (e) {} delete _markers[id]; });
+    renderSquadPills();
+    setPill();
     renderStrip({});
 }
 
-function setPill(on) {
+function renderSquadPills() {
+    const box = document.getElementById('squad-pills');
+    if (!box) return;
+    const codes = Object.keys(_squads);
+    box.innerHTML = codes.map(c =>
+        `<button class="squad-pill" data-squad="${c}">${c} &#10005;</button>`
+    ).join('');
+}
+
+function setPill() {
     const p = document.getElementById('conn-pill');
+    const codes = Object.keys(_squads);
+    const on = codes.some(c => _squads[c].on);
     p.textContent = on ? 'CONNECTED' : 'OFFLINE';
     p.classList.toggle('on', on);
 }
 
 // ── UI wiring ─────────────────────────────────────────────────────────────
 function validEntryCodeLen(code) { return code.length === 7 || code === DEMO_SQUAD_CODE; }
-document.getElementById('entry-btn').addEventListener('click', () => {
+
+function openEntry(addMode) {
+    const ov = document.getElementById('entry-overlay');
+    document.getElementById('entry-title').textContent = addMode ? 'ADD SQUAD' : 'LIVE VIEW';
+    document.getElementById('entry-cancel').classList.toggle('hidden', !addMode);
+    document.getElementById('entry-code').value = '';
+    document.getElementById('entry-btn').disabled = true;
+    document.getElementById('entry-btn').textContent = addMode ? 'ADD' : 'CONNECT';
+    ov.classList.remove('hidden');
+    setTimeout(() => { try { document.getElementById('entry-code').focus(); } catch (e) {} }, 80);
+}
+
+document.getElementById('entry-btn').addEventListener('click', async () => {
+    const btn  = document.getElementById('entry-btn');
     const code = (document.getElementById('entry-code').value || '').trim().toUpperCase();
     if (!validEntryCodeLen(code)) return;
-    document.getElementById('squad-pill').textContent = code;
-    document.getElementById('entry-overlay').classList.add('hidden');
-    connect(code);
+    btn.disabled = true;
+    const ok = await addSquad(code);
+    if (ok) {
+        document.getElementById('entry-code').value = '';
+        document.getElementById('entry-overlay').classList.add('hidden');
+        try { _map.invalidateSize(); } catch (e) {}
+    } else {
+        btn.disabled = false;
+    }
 });
+
 document.getElementById('entry-code').addEventListener('input', () => {
     const code = (document.getElementById('entry-code').value || '').trim().toUpperCase();
     document.getElementById('entry-btn').disabled = !validEntryCodeLen(code);
@@ -474,11 +563,21 @@ document.getElementById('entry-code').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('entry-btn').click();
 });
 
+document.getElementById('entry-cancel').addEventListener('click', () => {
+    document.getElementById('entry-overlay').classList.add('hidden');
+});
+
+document.getElementById('add-squad-btn').addEventListener('click', () => openEntry(true));
+
+document.getElementById('squad-pills').addEventListener('click', e => {
+    const b = e.target.closest('.squad-pill[data-squad]');
+    if (!b) return;
+    removeSquad(b.dataset.squad);
+});
+
 document.getElementById('disc-btn').addEventListener('click', () => {
     disconnect();
-    document.getElementById('entry-code').value = '';
-    document.getElementById('squad-pill').textContent = '';
-    document.getElementById('entry-overlay').classList.remove('hidden');
+    openEntry(false);
 });
 document.getElementById('rower-strip').addEventListener('click', e => {
     const up = e.target.closest('.rc-move-up[data-move-id]');
@@ -554,14 +653,15 @@ setInterval(() => { if (Object.keys(_rowers).length) renderStrip(_rowers); }, 20
 new ResizeObserver(() => _map.invalidateSize()).observe(document.getElementById('map'));
 setTimeout(() => { try { _map.invalidateSize(); } catch (e) {} }, 300);
 setTimeout(() => { try { _map.invalidateSize(); } catch (e) {} }, 1000);
-(function () {
+(async function () {
     const params = new URLSearchParams(window.location.search);
-    const code = (params.get('code') || '').trim().toUpperCase();
-    if (code.length >= 3) {
-        document.getElementById('entry-code').value = code;
-        document.getElementById('squad-pill').textContent = code;
+    const raw = (params.get('code') || '').trim().toUpperCase();
+    if (raw.length >= 3) {
+        const codes = raw.split(/[,+ ]+/).filter(c => c.length >= 3);
         document.getElementById('entry-overlay').classList.add('hidden');
-        connect(code);
+        let any = false;
+        for (const c of codes) { if (await addSquad(c)) any = true; }
+        if (!any) openEntry(false);
     }
 })();
 </script>
